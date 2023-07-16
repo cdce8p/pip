@@ -88,6 +88,7 @@ class InstallRequirement:
         hash_options: Optional[Dict[str, List[str]]] = None,
         config_settings: Optional[Dict[str, str]] = None,
         constraint: bool = False,
+        overwrite: bool = False,
         extras: Collection[str] = (),
         user_supplied: bool = False,
         permit_editable_wheels: bool = False,
@@ -96,6 +97,7 @@ class InstallRequirement:
         self.req = req
         self.comes_from = comes_from
         self.constraint = constraint
+        self.overwrite = overwrite
         self.editable = editable
         self.permit_editable_wheels = permit_editable_wheels
         self.legacy_install_reason: Optional[LegacyInstallReason] = None

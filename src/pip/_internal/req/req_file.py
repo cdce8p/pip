@@ -55,6 +55,7 @@ SUPPORTED_OPTIONS: List[Callable[..., optparse.Option]] = [
     cmdoptions.extra_index_url,
     cmdoptions.no_index,
     cmdoptions.constraints,
+    cmdoptions.overwrites,
     cmdoptions.requirements,
     cmdoptions.editable,
     cmdoptions.find_links,
@@ -85,6 +86,7 @@ class ParsedRequirement:
         is_editable: bool,
         comes_from: str,
         constraint: bool,
+        overwrite: bool,
         options: Optional[Dict[str, Any]] = None,
         line_source: Optional[str] = None,
     ) -> None:
@@ -93,6 +95,7 @@ class ParsedRequirement:
         self.comes_from = comes_from
         self.options = options
         self.constraint = constraint
+        self.overwrite = overwrite
         self.line_source = line_source
 
 
@@ -104,11 +107,13 @@ class ParsedLine:
         args: str,
         opts: Values,
         constraint: bool,
+        overwrite: bool,
     ) -> None:
         self.filename = filename
         self.lineno = lineno
         self.opts = opts
         self.constraint = constraint
+        self.overwrite = overwrite
 
         if args:
             self.is_requirement = True
@@ -129,6 +134,7 @@ def parse_requirements(
     finder: Optional["PackageFinder"] = None,
     options: Optional[optparse.Values] = None,
     constraint: bool = False,
+    overwrite: bool = False,
 ) -> Generator[ParsedRequirement, None, None]:
     """Parse a requirements file and yield ParsedRequirement instances.
 
@@ -142,7 +148,7 @@ def parse_requirements(
     line_parser = get_line_parser(finder)
     parser = RequirementsFileParser(session, line_parser)
 
-    for parsed_line in parser.parse(filename, constraint):
+    for parsed_line in parser.parse(filename, constraint, overwrite):
         parsed_req = handle_line(
             parsed_line, options=options, finder=finder, session=session
         )
@@ -184,6 +190,7 @@ def handle_requirement_line(
             is_editable=line.is_editable,
             comes_from=line_comes_from,
             constraint=line.constraint,
+            overwrite=line.overwrite,
         )
     else:
         # get the options that apply to requirements
@@ -198,6 +205,7 @@ def handle_requirement_line(
             is_editable=line.is_editable,
             comes_from=line_comes_from,
             constraint=line.constraint,
+            overwrite=line.overwrite,
             options=req_options,
             line_source=line_source,
         )
@@ -321,25 +329,29 @@ class RequirementsFileParser:
         self._line_parser = line_parser
 
     def parse(
-        self, filename: str, constraint: bool
+        self, filename: str, constraint: bool, overwrite: bool
     ) -> Generator[ParsedLine, None, None]:
         """Parse a given file, yielding parsed lines."""
-        yield from self._parse_and_recurse(filename, constraint)
+        yield from self._parse_and_recurse(filename, constraint, overwrite)
 
     def _parse_and_recurse(
-        self, filename: str, constraint: bool
+        self, filename: str, constraint: bool, overwrite: bool
     ) -> Generator[ParsedLine, None, None]:
-        for line in self._parse_file(filename, constraint):
+        for line in self._parse_file(filename, constraint, overwrite):
             if not line.is_requirement and (
                 line.opts.requirements or line.opts.constraints
             ):
+                nested_constraint = False
+                nested_overwrite = False
                 # parse a nested requirements file
                 if line.opts.requirements:
                     req_path = line.opts.requirements[0]
-                    nested_constraint = False
-                else:
+                elif line.opts.constraints:
                     req_path = line.opts.constraints[0]
                     nested_constraint = True
+                else:
+                    req_path = line.opts.overwrites[0]
+                    nested_overwrite = True
 
                 # original file is over http
                 if SCHEME_RE.search(filename):
@@ -353,12 +365,12 @@ class RequirementsFileParser:
                         req_path,
                     )
 
-                yield from self._parse_and_recurse(req_path, nested_constraint)
+                yield from self._parse_and_recurse(req_path, nested_constraint, nested_overwrite)
             else:
                 yield line
 
     def _parse_file(
-        self, filename: str, constraint: bool
+        self, filename: str, constraint: bool, overwrite: bool
     ) -> Generator[ParsedLine, None, None]:
         _, content = get_file_content(filename, self._session)
 
@@ -378,6 +390,7 @@ class RequirementsFileParser:
                 args_str,
                 opts,
                 constraint,
+                overwrite,
             )
 
 

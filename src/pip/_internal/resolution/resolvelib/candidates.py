@@ -88,6 +88,7 @@ def make_install_req_from_editable(
         use_pep517=template.use_pep517,
         isolated=template.isolated,
         constraint=template.constraint,
+        overwrite=template.overwrite,
         permit_editable_wheels=template.permit_editable_wheels,
         options=dict(
             install_options=template.install_options,

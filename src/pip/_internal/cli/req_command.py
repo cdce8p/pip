@@ -392,6 +392,21 @@ class RequirementCommand(IndexGroupCommand):
         Parse command-line arguments into the corresponding requirements.
         """
         requirements: List[InstallRequirement] = []
+        for filename in options.overwrites:
+            for parsed_req in parse_requirements(
+                filename,
+                overwrite=True,
+                finder=finder,
+                options=options,
+                session=session,
+            ):
+                req_to_add = install_req_from_parsed_requirement(
+                    parsed_req,
+                    isolated=options.isolated_mode,
+                    user_supplied=False,
+                )
+                requirements.append(req_to_add)
+
         for filename in options.constraints:
             for parsed_req in parse_requirements(
                 filename,

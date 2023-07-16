@@ -47,7 +47,7 @@ from pip._internal.utils.hashes import Hashes
 from pip._internal.utils.packaging import get_requirement
 from pip._internal.utils.virtualenv import running_under_virtualenv
 
-from .base import Candidate, CandidateVersion, Constraint, Requirement
+from .base import Candidate, CandidateVersion, Constraint, Overwrite, Requirement
 from .candidates import (
     AlreadyInstalledCandidate,
     BaseCandidate,
@@ -82,6 +82,7 @@ Cache = Dict[Link, C]
 class CollectedRootRequirements(NamedTuple):
     requirements: List[Requirement]
     constraints: Dict[str, Constraint]
+    overwrites: Dict[str, Overwrite]
     user_requested: Dict[str, int]
 
 
@@ -373,6 +374,7 @@ class Factory:
         requirements: Mapping[str, Iterable[Requirement]],
         incompatibilities: Mapping[str, Iterator[Candidate]],
         constraint: Constraint,
+        overwrite: Overwrite,
         prefers_installed: bool,
     ) -> Iterable[Candidate]:
         # Collect basic lookup information from the requirements.
@@ -472,9 +474,9 @@ class Factory:
     def collect_root_requirements(
         self, root_ireqs: List[InstallRequirement]
     ) -> CollectedRootRequirements:
-        collected = CollectedRootRequirements([], {}, {})
+        collected = CollectedRootRequirements([], {}, {}, {})
         for i, ireq in enumerate(root_ireqs):
-            if ireq.constraint:
+            if ireq.constraint or ireq.overwrite:
                 # Ensure we only accept valid constraints
                 problem = check_invalid_constraint_type(ireq)
                 if problem:
@@ -483,10 +485,16 @@ class Factory:
                     continue
                 assert ireq.name, "Constraint must be named"
                 name = canonicalize_name(ireq.name)
-                if name in collected.constraints:
-                    collected.constraints[name] &= ireq
+                if ireq.constraint:
+                    if name in collected.constraints:
+                        collected.constraints[name] &= ireq
+                    else:
+                        collected.constraints[name] = Constraint.from_ireq(ireq)
                 else:
-                    collected.constraints[name] = Constraint.from_ireq(ireq)
+                    if name in collected.overwrites:
+                        collected.overwrites[name] &= ireq
+                    else:
+                        collected.overwrites[name] = Overwrite.from_ireq(ireq)
             else:
                 req = self._make_requirement_from_install_req(
                     ireq,

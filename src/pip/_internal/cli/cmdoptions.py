@@ -402,6 +402,19 @@ def constraints() -> Option:
     )
 
 
+def overwrites() -> Option:
+    return Option(
+        "-o",
+        "--overwrites",
+        dest="overwrites",
+        action="append",
+        default=[],
+        metavar="file",
+        help="Overwrite versions using the given overwrites file. "
+        "This option can be used multiple times.",
+    )
+
+
 def requirements() -> Option:
     return Option(
         "-r",

@@ -3,6 +3,7 @@ from typing import FrozenSet, Iterable, Optional, Tuple, Union
 from pip._vendor.packaging.specifiers import SpecifierSet
 from pip._vendor.packaging.utils import NormalizedName, canonicalize_name
 from pip._vendor.packaging.version import LegacyVersion, Version
+from pip._vendor.typing_extensions import Self
 
 from pip._internal.models.link import Link, links_equivalent
 from pip._internal.req.req_install import InstallRequirement
@@ -28,18 +29,18 @@ class Constraint:
         self.links = links
 
     @classmethod
-    def empty(cls) -> "Constraint":
-        return Constraint(SpecifierSet(), Hashes(), frozenset())
+    def empty(cls) -> Self:
+        return cls(SpecifierSet(), Hashes(), frozenset())
 
     @classmethod
-    def from_ireq(cls, ireq: InstallRequirement) -> "Constraint":
+    def from_ireq(cls, ireq: InstallRequirement) -> Self:
         links = frozenset([ireq.link]) if ireq.link else frozenset()
-        return Constraint(ireq.specifier, ireq.hashes(trust_internet=False), links)
+        return cls(ireq.specifier, ireq.hashes(trust_internet=False), links)
 
     def __bool__(self) -> bool:
         return bool(self.specifier) or bool(self.hashes) or bool(self.links)
 
-    def __and__(self, other: InstallRequirement) -> "Constraint":
+    def __and__(self, other: InstallRequirement) -> Self:
         if not isinstance(other, InstallRequirement):
             return NotImplemented
         specifier = self.specifier & other.specifier
@@ -47,7 +48,7 @@ class Constraint:
         links = self.links
         if other.link:
             links = links.union([other.link])
-        return Constraint(specifier, hashes, links)
+        return type(self)(specifier, hashes, links)
 
     def is_satisfied_by(self, candidate: "Candidate") -> bool:
         # Reject if there are any mismatched URL constraints on this package.
@@ -57,6 +58,10 @@ class Constraint:
         # already implements the prerelease logic, and would have filtered out
         # prerelease candidates if the user does not expect them.
         return self.specifier.contains(candidate.version, prereleases=True)
+
+
+class Overwrite(Constraint):
+    ...
 
 
 class Requirement:

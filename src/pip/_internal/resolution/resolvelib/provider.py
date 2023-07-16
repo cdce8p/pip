@@ -13,7 +13,7 @@ from typing import (
 
 from pip._vendor.resolvelib.providers import AbstractProvider
 
-from .base import Candidate, Constraint, Requirement
+from .base import Candidate, Constraint, Overwrite, Requirement
 from .candidates import REQUIRES_PYTHON_IDENTIFIER
 from .factory import Factory
 
@@ -80,6 +80,8 @@ class PipProvider(_ProviderBase):
 
     :params constraints: A mapping of constraints specified by the user. Keys
         are canonicalized project names.
+    :params overwrites: A mapping of overwrites specified by the user. Keys
+        are canonicalized project names.
     :params ignore_dependencies: Whether the user specified ``--no-deps``.
     :params upgrade_strategy: The user-specified upgrade strategy.
     :params user_requested: A set of canonicalized package names that the user
@@ -90,12 +92,14 @@ class PipProvider(_ProviderBase):
         self,
         factory: Factory,
         constraints: Dict[str, Constraint],
+        overwrites: Dict[str, Overwrite],
         ignore_dependencies: bool,
         upgrade_strategy: str,
         user_requested: Dict[str, int],
     ) -> None:
         self._factory = factory
         self._constraints = constraints
+        self._overwrites = overwrites
         self._ignore_dependencies = ignore_dependencies
         self._upgrade_strategy = upgrade_strategy
         self._user_requested = user_requested
@@ -239,10 +243,16 @@ class PipProvider(_ProviderBase):
             identifier,
             default=Constraint.empty(),
         )
+        overwrite = _get_with_identifier(
+            self._overwrites,
+            identifier,
+            default=Overwrite.empty(),
+        )
         return self._factory.find_candidates(
             identifier=identifier,
             requirements=requirements,
             constraint=constraint,
+            overwrite=overwrite,
             prefers_installed=(not _eligible_for_upgrade(identifier)),
             incompatibilities=incompatibilities,
         )
